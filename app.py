@@ -1,3 +1,5 @@
+import gdown
+import o
 import streamlit as st
 import numpy as np
 import cv2
@@ -5,6 +7,17 @@ from keras.models import load_model
 from PIL import Image
 from skimage.metrics import mean_squared_error, peak_signal_noise_ratio, structural_similarity
 import math
+
+# Google Drive file IDs
+SRCNN_ID = "1MfN1zcYVGPp5nUW7I13-6CzgE5ScZ4b9"
+UNET_ID = "1OvWQVIaw7XQIqZIr_feb1mirZS50BeiX"
+
+# Download if not exists
+if not os.path.exists("srcnn_model.keras"):
+    gdown.download(f"https://drive.google.com/uc?id={SRCNN_ID}", "srcnn_model.keras", quiet=False)
+
+if not os.path.exists("unet_model.keras"):
+    gdown.download(f"https://drive.google.com/uc?id={UNET_ID}", "unet_model.keras", quiet=False)
 
 # Load models
 model_srcnn = load_model('srcnn_model.keras', compile=False)
