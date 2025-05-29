@@ -4,5 +4,3 @@ opencv-python-headless
 pillow
 scikit-image
 tensorflow
-keras
-gdown
