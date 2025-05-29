@@ -1,8 +1,7 @@
 streamlit
 numpy
-opencv-python
-tensorflow
-Pillow
+opencv-python-headless
+pillow
 scikit-image
+tensorflow
 keras
-gdown

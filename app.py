@@ -1,5 +1,5 @@
-import gdown
 import os
+import urllib.request
 import streamlit as st
 import numpy as np
 import cv2
@@ -8,16 +8,17 @@ from PIL import Image
 from skimage.metrics import mean_squared_error, peak_signal_noise_ratio, structural_similarity
 import math
 
-# Google Drive file IDs
-SRCNN_ID = "1MfN1zcYVGPp5nUW7I13-6CzgE5ScZ4b9"
-UNET_ID = "1OvWQVIaw7XQIqZIr_feb1mirZS50BeiX"
+# URL Hugging Face
+srcnn_url = "https://huggingface.co/Dimsralf/model/resolve/main/srcnn_model.keras?download=true"
+unet_url = "https://huggingface.co/Dimsralf/model/resolve/main/unet_model.keras?download=true"
 
-# Download if not exists
+# Download file jika belum ada
 if not os.path.exists("srcnn_model.keras"):
-    gdown.download(f"https://drive.google.com/uc?id={SRCNN_ID}", "srcnn_model.keras", quiet=False)
+    urllib.request.urlretrieve(srcnn_url, "srcnn_model.keras")
 
 if not os.path.exists("unet_model.keras"):
-    gdown.download(f"https://drive.google.com/uc?id={UNET_ID}", "unet_model.keras", quiet=False)
+    urllib.request.urlretrieve(unet_url, "unet_model.keras")
+
 
 # Load models
 model_srcnn = load_model('srcnn_model.keras', compile=False)
