@@ -1,5 +1,5 @@
 import gdown
-import o
+import os
 import streamlit as st
 import numpy as np
 import cv2
