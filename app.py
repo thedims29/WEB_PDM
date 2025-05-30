@@ -24,10 +24,7 @@ if not os.path.exists("unet_model.keras"):
 
 
 # Load models
-custom_objects_srcnn = {
-    'Conv2D': Conv2D
-}
-model_srcnn = tf.keras.models.load_model('srcnn_model.keras', custom_objects=custom_objects_srcnn, compile=False)
+model_srcnn = tf.keras.models.load_model('srcnn_model.keras', compile=False)
 
 # U-Net dengan custom objects
 custom_objects = {
@@ -36,7 +33,7 @@ custom_objects = {
     'Dropout': layers.Dropout,
     'concatenate': tf.keras.layers.concatenate
 }
-model_unet = load_model('unet_model.keras', compile=False)
+model_unet = load_model('unet_model.keras', custom_objects=custom_objects, compile=False)
 
 # Metrics calculation
 def calculate_metrics(original, restored):
