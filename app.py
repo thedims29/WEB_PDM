@@ -51,7 +51,7 @@ def download_models():
 # Load models with proper weight loading
 # ----------------------------
 try:
-    model_srcnn = tf.keras.models.load_model("/mnt/data/srcnn_model.keras", compile=False)
+    model_srcnn = tf.keras.models.load_model("srcnn_model.keras", compile=False)
 except Exception as e:
     st.error(f"Failed to load SRCNN model: {str(e)}")
     st.stop()
