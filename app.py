@@ -23,7 +23,10 @@ if not os.path.exists("unet_model.keras"):
 
 
 # Load models
-model_srcnn = load_model('srcnn_model.keras', compile=False)
+custom_objects_srcnn = {
+    'Conv2D': Conv2D
+}
+model_srcnn = tf.keras.models.load_model('srcnn_model.keras', custom_objects=custom_objects_srcnn, compile=False)
 
 # U-Net dengan custom objects
 custom_objects = {
