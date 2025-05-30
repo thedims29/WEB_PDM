@@ -3,7 +3,9 @@ import urllib.request
 import streamlit as st
 import numpy as np
 import cv2
-from keras.models import load_model
+import tensorflow as tf
+from tensorflow.keras import layers
+from tensorflow.keras.models import load_model
 from PIL import Image
 from skimage.metrics import mean_squared_error, peak_signal_noise_ratio, structural_similarity
 import math
@@ -22,6 +24,14 @@ if not os.path.exists("unet_model.keras"):
 
 # Load models
 model_srcnn = load_model('srcnn_model.keras', compile=False)
+
+# U-Net dengan custom objects
+custom_objects = {
+    'LeakyReLU': layers.LeakyReLU,
+    'BatchNormalization': layers.BatchNormalization,
+    'Dropout': layers.Dropout,
+    'concatenate': tf.keras.layers.concatenate
+}
 model_unet = load_model('unet_model.keras', compile=False)
 
 # Metrics calculation
