@@ -24,17 +24,28 @@ def build_srcnn_model():
 # ----------------------------
 # Download models
 # ----------------------------
-srcnn_url = "https://huggingface.co/Dimsralf/model/resolve/main/srcnn_model.keras?download=true"
-unet_url = "https://huggingface.co/Dimsralf/model/resolve/main/unet_model.keras?download=true"
-
 @st.cache_resource
 def download_models():
     if not os.path.exists("srcnn_model.keras"):
-        urllib.request.urlretrieve(srcnn_url, "srcnn_model.keras")
+        try:
+            urllib.request.urlretrieve(
+                "https://huggingface.co/Dimsralf/model/resolve/main/srcnn_model.keras?download=true",
+                "srcnn_model.keras"
+            )
+        except Exception as e:
+            st.error(f"Gagal mengunduh SRCNN model: {e}")
+            st.stop()
+    
     if not os.path.exists("unet_model.keras"):
-        urllib.request.urlretrieve(unet_url, "unet_model.keras")
+        try:
+            urllib.request.urlretrieve(
+                "https://huggingface.co/Dimsralf/model/resolve/main/unet_model.keras?download=true",
+                "unet_model.keras"
+            )
+        except Exception as e:
+            st.error(f"Gagal mengunduh U-Net model: {e}")
+            st.stop()
 
-download_models()
 
 # ----------------------------
 # Load models with proper weight loading
