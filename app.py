@@ -27,31 +27,47 @@ def build_srcnn_model():
 srcnn_url = "https://huggingface.co/Dimsralf/model/resolve/main/srcnn_model.keras?download=true"
 unet_url = "https://huggingface.co/Dimsralf/model/resolve/main/unet_model.keras?download=true"
 
-if not os.path.exists("srcnn_model.keras"):
-    urllib.request.urlretrieve(srcnn_url, "srcnn_model.keras")
+@st.cache_resource
+def download_models():
+    if not os.path.exists("srcnn_model.keras"):
+        urllib.request.urlretrieve(srcnn_url, "srcnn_model.keras")
+    if not os.path.exists("unet_model.keras"):
+        urllib.request.urlretrieve(unet_url, "unet_model.keras")
 
-if not os.path.exists("unet_model.keras"):
-    urllib.request.urlretrieve(unet_url, "unet_model.keras")
-
-# ----------------------------
-# Load models
-# ----------------------------
-# SRCNN: Rebuild architecture and load weights
-from tensorflow.keras.models import load_model
-model_srcnn = load_model("srcnn_model.keras", compile=False)
-
-# U-Net: Load with custom objects
-from tensorflow.keras.models import load_model
-custom_objects = {
-    'LeakyReLU': tf.keras.layers.LeakyReLU,
-    'BatchNormalization': tf.keras.layers.BatchNormalization,
-    'Dropout': tf.keras.layers.Dropout,
-    'concatenate': tf.keras.layers.concatenate,
-}
-model_unet = load_model("unet_model.keras", custom_objects=custom_objects, compile=False)
+download_models()
 
 # ----------------------------
-# Image Utilities
+# Load models with error handling
+# ----------------------------
+try:
+    # Try loading SRCNN directly first
+    model_srcnn = tf.keras.models.load_model("srcnn_model.keras", compile=False)
+except:
+    try:
+        # If that fails, build architecture and load weights
+        model_srcnn = build_srcnn_model()
+        model_srcnn.load_weights("srcnn_model.keras")
+    except Exception as e:
+        st.error(f"Failed to load SRCNN model: {str(e)}")
+        st.stop()
+
+try:
+    # U-Net: Load with custom objects
+    custom_objects = {
+        'LeakyReLU': tf.keras.layers.LeakyReLU,
+        'BatchNormalization': tf.keras.layers.BatchNormalization,
+        'Dropout': tf.keras.layers.Dropout,
+        'concatenate': tf.keras.layers.concatenate,
+    }
+    model_unet = tf.keras.models.load_model("unet_model.keras", 
+                                          custom_objects=custom_objects, 
+                                          compile=False)
+except Exception as e:
+    st.error(f"Failed to load U-Net model: {str(e)}")
+    st.stop()
+
+# ----------------------------
+# Rest of your code remains the same
 # ----------------------------
 def add_blur(image, blur_level):
     if blur_level == 0:
@@ -103,9 +119,6 @@ with col1:
             st.session_state['srcnn'] = output_srcnn
             st.session_state['unet'] = output_unet
 
-# ----------------------------
-# Display Results
-# ----------------------------
 if 'original' in st.session_state:
     col1.image(st.session_state['blurred'], caption="Citra Blur", use_container_width=True)
     col2.image(st.session_state['original'], caption="Before", use_container_width=True)
@@ -115,7 +128,7 @@ if 'original' in st.session_state:
     def render_metrics(col, title, target):
         mse, rmse, psnr_val, ssim_val = calculate_metrics(st.session_state['original'], target)
         with col:
-            st.markdown(f"**Parameter – {title}**")
+            st.markdown(f"**Parameter - {title}**")
             st.markdown(f"MSE  : `{mse:.4f}`")
             st.markdown(f"RMSE : `{rmse:.4f}`")
             st.markdown(f"PSNR : `{psnr_val:.2f}`")
