@@ -11,14 +11,14 @@ from skimage.metrics import mean_squared_error, peak_signal_noise_ratio, structu
 import math
 
 # ----------------------------
-# Build SRCNN model manually
+# Build SRCNN model with proper layer naming
 # ----------------------------
 def build_srcnn_model():
-    input_img = Input(shape=(256, 256, 3))
-    l1 = Conv2D(64, 9, padding='same', activation='relu')(input_img)
-    l2 = Conv2D(32, 3, padding='same', activation='relu')(l1)
-    l3 = Conv2D(16, 1, padding='same', activation='relu')(l2)
-    l4 = Conv2D(3, 5, padding='same', activation='relu')(l3)
+    input_img = Input(shape=(256, 256, 3), name='input_layer')
+    l1 = Conv2D(64, 9, padding='same', activation='relu', name='conv2d_1')(input_img)
+    l2 = Conv2D(32, 3, padding='same', activation='relu', name='conv2d_2')(l1)
+    l3 = Conv2D(16, 1, padding='same', activation='relu', name='conv2d_3')(l2)
+    l4 = Conv2D(3, 5, padding='same', activation='relu', name='conv2d_4')(l3)
     return Model(inputs=input_img, outputs=l4)
 
 # ----------------------------
@@ -37,19 +37,18 @@ def download_models():
 download_models()
 
 # ----------------------------
-# Load models with error handling
+# Load models with proper weight loading
 # ----------------------------
 try:
-    # Try loading SRCNN directly first
-    model_srcnn = tf.keras.models.load_model("srcnn_model.keras", compile=False)
-except:
-    try:
-        # If that fails, build architecture and load weights
-        model_srcnn = build_srcnn_model()
-        model_srcnn.load_weights("srcnn_model.keras")
-    except Exception as e:
-        st.error(f"Failed to load SRCNN model: {str(e)}")
-        st.stop()
+    # First build the SRCNN model architecture
+    model_srcnn = build_srcnn_model()
+    # Then load the weights separately
+    model_srcnn.load_weights("srcnn_model.keras")
+    # Compile the model (not necessary for inference but good practice)
+    model_srcnn.compile(optimizer='adam', loss='mse')
+except Exception as e:
+    st.error(f"Failed to load SRCNN model: {str(e)}")
+    st.stop()
 
 try:
     # U-Net: Load with custom objects
