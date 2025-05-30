@@ -4,27 +4,20 @@ import streamlit as st
 import numpy as np
 import cv2
 import tensorflow as tf
-from tensorflow.keras import layers
 from tensorflow.keras.models import load_model
 from PIL import Image
 from skimage.metrics import mean_squared_error, peak_signal_noise_ratio, structural_similarity
 import math
 
-# URL Hugging Face untuk U-Net
-unet_url = "https://huggingface.co/Dimsralf/model/resolve/main/unet_model.keras?download=true"
+# URL Hugging Face untuk model SRCNN
+srcnn_url = "https://huggingface.co/Dimsralf/model/resolve/main/srcnn_model.h5?download=true"
 
 # Download file jika belum ada
-if not os.path.exists("unet_model.keras"):
-    urllib.request.urlretrieve(unet_url, "unet_model.keras")
+if not os.path.exists("srcnn_model.h5"):
+    urllib.request.urlretrieve(srcnn_url, "srcnn_model.h5")
 
-# Load model U-Net dengan custom objects
-custom_objects = {
-    'LeakyReLU': layers.LeakyReLU,
-    'BatchNormalization': layers.BatchNormalization,
-    'Dropout': layers.Dropout,
-    'concatenate': tf.keras.layers.concatenate
-}
-model_unet = load_model('unet_model.keras', custom_objects=custom_objects, compile=False)
+# Load model SRCNN
+model_srcnn = load_model("srcnn_model.h5", compile=False)
 
 # Fungsi menghitung metrik evaluasi
 def calculate_metrics(original, restored):
@@ -36,24 +29,24 @@ def calculate_metrics(original, restored):
     try:
         ssim_val = structural_similarity(original, restored, channel_axis=-1, data_range=1.0)
     except ValueError:
-        ssim_val = 0.0  # fallback jika ukuran terlalu kecil
+        ssim_val = 0.0
     return mse_val, rmse_val, psnr_val, ssim_val
 
-# Tambah blur ke gambar
+# Tambahkan blur ke gambar
 def add_blur(image, blur_level):
     if blur_level == 0:
         return image
     return cv2.GaussianBlur(image, (2 * blur_level + 1, 2 * blur_level + 1), 0)
 
-# Prediksi gambar
-def predict_image(model, image):
+# Fungsi prediksi SRCNN
+def predict_srcnn(model, image):
     input_img = image.astype(np.float32)
     pred = model.predict(np.expand_dims(input_img, axis=0), verbose=0)
     return np.clip(pred[0], 0.0, 1.0)
 
 # Streamlit UI
-st.set_page_config(layout="wide", page_title="Restorasi Citra (U-Net Only)")
-st.title("🖼️ Restorasi Citra Menggunakan U-Net")
+st.set_page_config(layout="wide", page_title="Restorasi Citra (SRCNN Only)")
+st.title("🖼️ Restorasi Citra Menggunakan SRCNN")
 
 # UI Layout
 col1, col2, col3 = st.columns([1.2, 1.2, 1.2])
@@ -71,19 +64,19 @@ with col1:
             blurred_image = add_blur((image_np * 255).astype(np.uint8), blur_level)
             blurred_image = blurred_image.astype(np.float32) / 255.0
 
-            # Predict with U-Net only
-            output_unet = predict_image(model_unet, blurred_image)
+            # Predict with SRCNN only
+            output_srcnn = predict_srcnn(model_srcnn, blurred_image)
 
             # Save to session
             st.session_state['original'] = image_np
             st.session_state['blurred'] = blurred_image
-            st.session_state['unet'] = output_unet
+            st.session_state['srcnn'] = output_srcnn
 
 # Tampilkan hasil
 if 'original' in st.session_state:
     col1.image(st.session_state['blurred'], caption="Citra Blur", use_container_width=True)
     col2.image(st.session_state['original'], caption="Before", use_container_width=True)
-    col3.image(st.session_state['unet'], caption="U-NET Restored", use_container_width=True)
+    col3.image(st.session_state['srcnn'], caption="SRCNN Restored", use_container_width=True)
 
     # Fungsi tampilkan metrik
     def render_metrics(col, title, target):
@@ -98,4 +91,4 @@ if 'original' in st.session_state:
     st.markdown("---")
     col4, col5 = st.columns(2)
     render_metrics(col4, "Before", st.session_state['blurred'])
-    render_metrics(col5, "U-NET", st.session_state['unet'])
+    render_metrics(col5, "SRCNN", st.session_state['srcnn'])
