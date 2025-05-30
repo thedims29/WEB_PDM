@@ -5,13 +5,12 @@ import numpy as np
 import cv2
 import tensorflow as tf
 from tensorflow.keras import layers
-from tensorflow.keras.models import Model, load_model
-from tensorflow.keras.layers import Input, Conv2D
+from tensorflow.keras.models import load_model
 from PIL import Image
 from skimage.metrics import mean_squared_error, peak_signal_noise_ratio, structural_similarity
 import math
 
-# URLs Hugging Face
+# URL Hugging Face
 srcnn_url = "https://huggingface.co/Dimsralf/model/resolve/main/srcnn_model.keras?download=true"
 unet_url = "https://huggingface.co/Dimsralf/model/resolve/main/unet_model.keras?download=true"
 
@@ -23,20 +22,10 @@ if not os.path.exists("unet_model.keras"):
     urllib.request.urlretrieve(unet_url, "unet_model.keras")
 
 
-# === SRCNN Architecture ===
-def build_srcnn_model():
-    input_img = Input(shape=(256, 256, 3))
-    l1 = Conv2D(64, 9, padding='same', activation='relu')(input_img)
-    l2 = Conv2D(32, 3, padding='same', activation='relu')(l1)
-    l3 = Conv2D(16, 1, padding='same', activation='relu')(l2)
-    l4 = Conv2D(3, 5, padding='same', activation='relu')(l3)
-    return Model(inputs=input_img, outputs=l4)
+# Load models
+model_srcnn = load_model('srcnn_model.keras', compile=False)
 
-# Load SRCNN
-model_srcnn = build_srcnn_model()
-model_srcnn.load_weights('srcnn_model.keras')
-
-# Load U-Net dengan custom_objects
+# U-Net dengan custom objects
 custom_objects = {
     'LeakyReLU': layers.LeakyReLU,
     'BatchNormalization': layers.BatchNormalization,
@@ -45,8 +34,7 @@ custom_objects = {
 }
 model_unet = load_model('unet_model.keras', custom_objects=custom_objects, compile=False)
 
-
-# === METRICS ===
+# Metrics calculation
 def calculate_metrics(original, restored):
     original = np.clip(original, 0, 1)
     restored = np.clip(restored, 0, 1)
@@ -56,61 +44,62 @@ def calculate_metrics(original, restored):
     try:
         ssim_val = structural_similarity(original, restored, channel_axis=-1, data_range=1.0)
     except ValueError:
-        ssim_val = 0.0
+        ssim_val = 0.0  # fallback jika ukuran terlalu kecil
     return mse_val, rmse_val, psnr_val, ssim_val
 
 
-# === BLUR FUNCTION ===
+# Apply blur to simulate damage
 def add_blur(image, blur_level):
     if blur_level == 0:
         return image
     return cv2.GaussianBlur(image, (2 * blur_level + 1, 2 * blur_level + 1), 0)
 
-
-# === PREDICT ===
+# Predict function
 def predict_image(model, image):
     input_img = image.astype(np.float32)
     pred = model.predict(np.expand_dims(input_img, axis=0), verbose=0)
     return np.clip(pred[0], 0.0, 1.0)
 
-
-# === STREAMLIT UI ===
+# Streamlit UI
 st.set_page_config(layout="wide", page_title="Restorasi Citra")
 st.title("🖼️ Restorasi Citra dengan SRCNN & U-Net")
 
+# UI Layout
 col1, col2, col3, col4 = st.columns([1.2, 1.2, 1.2, 1.2])
 
 with col1:
     uploaded_file = st.file_uploader("Upload Citra", type=["jpg", "png", "jpeg"])
     blur_level = st.slider("Tingkat Blur", min_value=0, max_value=10, value=5)
-
     if st.button("Proses"):
         if uploaded_file is not None:
             image = Image.open(uploaded_file).convert("RGB")
             image = image.resize((256, 256))
             image_np = np.array(image) / 255.0
 
-            # Apply blur
+            # Blur image
             blurred_image = add_blur((image_np * 255).astype(np.uint8), blur_level)
             blurred_image = blurred_image.astype(np.float32) / 255.0
 
-            # Inference
+            # Predict with SRCNN
             output_srcnn = predict_image(model_srcnn, blurred_image)
+
+            # Predict with U-Net
             output_unet = predict_image(model_unet, blurred_image)
 
-            # Simpan ke session
+            # Save to session
             st.session_state['original'] = image_np
             st.session_state['blurred'] = blurred_image
             st.session_state['srcnn'] = output_srcnn
             st.session_state['unet'] = output_unet
 
-# === TAMPILKAN HASIL ===
+# Show results
 if 'original' in st.session_state:
     col1.image(st.session_state['blurred'], caption="Citra Blur", use_container_width=True)
     col2.image(st.session_state['original'], caption="Before", use_container_width=True)
     col3.image(st.session_state['srcnn'], caption="SRCNN", use_container_width=True)
     col4.image(st.session_state['unet'], caption="U-NET", use_container_width=True)
 
+    # Metric Display Function
     def render_metrics(col, title, target):
         mse, rmse, psnr_val, ssim_val = calculate_metrics(st.session_state['original'], target)
         with col:
