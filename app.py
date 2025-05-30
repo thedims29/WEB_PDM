@@ -37,8 +37,8 @@ if not os.path.exists("unet_model.keras"):
 # Load models
 # ----------------------------
 # SRCNN: Rebuild architecture and load weights
-model_srcnn = build_srcnn_model()
-model_srcnn.load_weights("srcnn_model.keras")
+from tensorflow.keras.models import load_model
+model_srcnn = load_model("srcnn_model.keras", compile=False)
 
 # U-Net: Load with custom objects
 from tensorflow.keras.models import load_model
