@@ -40,12 +40,7 @@ download_models()
 # Load models with proper weight loading
 # ----------------------------
 try:
-    # First build the SRCNN model architecture
-    model_srcnn = build_srcnn_model()
-    # Then load the weights separately
-    model_srcnn.load_weights("srcnn_model.keras")
-    # Compile the model (not necessary for inference but good practice)
-    model_srcnn.compile(optimizer='adam', loss='mse')
+    model_srcnn = tf.keras.models.load_model("srcnn_model.keras", compile=False)
 except Exception as e:
     st.error(f"Failed to load SRCNN model: {str(e)}")
     st.stop()
