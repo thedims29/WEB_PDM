@@ -4,22 +4,65 @@ import streamlit as st
 import numpy as np
 import cv2
 import tensorflow as tf
-from tensorflow.keras.models import load_model
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Conv2D, Input
 from PIL import Image
 from skimage.metrics import mean_squared_error, peak_signal_noise_ratio, structural_similarity
 import math
 
-# URL Hugging Face untuk model SRCNN
-srcnn_url = "https://huggingface.co/Dimsralf/model/resolve/main/srcnn_model.h5?download=true"
+# ----------------------------
+# Build SRCNN model manually
+# ----------------------------
+def build_srcnn_model():
+    input_img = Input(shape=(256, 256, 3))
+    l1 = Conv2D(64, 9, padding='same', activation='relu')(input_img)
+    l2 = Conv2D(32, 3, padding='same', activation='relu')(l1)
+    l3 = Conv2D(16, 1, padding='same', activation='relu')(l2)
+    l4 = Conv2D(3, 5, padding='same', activation='relu')(l3)
+    return Model(inputs=input_img, outputs=l4)
 
-# Download file jika belum ada
-if not os.path.exists("srcnn_model.h5"):
-    urllib.request.urlretrieve(srcnn_url, "srcnn_model.h5")
+# ----------------------------
+# Download models
+# ----------------------------
+srcnn_url = "https://huggingface.co/Dimsralf/model/resolve/main/srcnn_model.keras?download=true"
+unet_url = "https://huggingface.co/Dimsralf/model/resolve/main/unet_model.keras?download=true"
 
-# Load model SRCNN
-model_srcnn = load_model("srcnn_model.h5", compile=False)
+if not os.path.exists("srcnn_model.keras"):
+    urllib.request.urlretrieve(srcnn_url, "srcnn_model.keras")
 
-# Fungsi menghitung metrik evaluasi
+if not os.path.exists("unet_model.keras"):
+    urllib.request.urlretrieve(unet_url, "unet_model.keras")
+
+# ----------------------------
+# Load models
+# ----------------------------
+# SRCNN: Rebuild architecture and load weights
+from tensorflow.keras.models import load_model
+model_srcnn = load_model("srcnn_model.keras", compile=False)
+
+# U-Net: Load with custom objects
+from tensorflow.keras.models import load_model
+custom_objects = {
+    'LeakyReLU': tf.keras.layers.LeakyReLU,
+    'BatchNormalization': tf.keras.layers.BatchNormalization,
+    'Dropout': tf.keras.layers.Dropout,
+    'concatenate': tf.keras.layers.concatenate,
+}
+model_unet = load_model("unet_model.keras", custom_objects=custom_objects, compile=False)
+
+# ----------------------------
+# Image Utilities
+# ----------------------------
+def add_blur(image, blur_level):
+    if blur_level == 0:
+        return image
+    return cv2.GaussianBlur(image, (2 * blur_level + 1, 2 * blur_level + 1), 0)
+
+def predict_image(model, image):
+    input_img = image.astype(np.float32)
+    pred = model.predict(np.expand_dims(input_img, axis=0), verbose=0)
+    return np.clip(pred[0], 0.0, 1.0)
+
 def calculate_metrics(original, restored):
     original = np.clip(original, 0, 1)
     restored = np.clip(restored, 0, 1)
@@ -32,24 +75,13 @@ def calculate_metrics(original, restored):
         ssim_val = 0.0
     return mse_val, rmse_val, psnr_val, ssim_val
 
-# Tambahkan blur ke gambar
-def add_blur(image, blur_level):
-    if blur_level == 0:
-        return image
-    return cv2.GaussianBlur(image, (2 * blur_level + 1, 2 * blur_level + 1), 0)
-
-# Fungsi prediksi SRCNN
-def predict_srcnn(model, image):
-    input_img = image.astype(np.float32)
-    pred = model.predict(np.expand_dims(input_img, axis=0), verbose=0)
-    return np.clip(pred[0], 0.0, 1.0)
-
+# ----------------------------
 # Streamlit UI
-st.set_page_config(layout="wide", page_title="Restorasi Citra (SRCNN Only)")
-st.title("🖼️ Restorasi Citra Menggunakan SRCNN")
+# ----------------------------
+st.set_page_config(layout="wide", page_title="Restorasi Citra")
+st.title("🖼️ Restorasi Citra dengan SRCNN & U-Net")
 
-# UI Layout
-col1, col2, col3 = st.columns([1.2, 1.2, 1.2])
+col1, col2, col3, col4 = st.columns([1.2, 1.2, 1.2, 1.2])
 
 with col1:
     uploaded_file = st.file_uploader("Upload Citra", type=["jpg", "png", "jpeg"])
@@ -60,35 +92,37 @@ with col1:
             image = image.resize((256, 256))
             image_np = np.array(image) / 255.0
 
-            # Blur image
             blurred_image = add_blur((image_np * 255).astype(np.uint8), blur_level)
             blurred_image = blurred_image.astype(np.float32) / 255.0
 
-            # Predict with SRCNN only
-            output_srcnn = predict_srcnn(model_srcnn, blurred_image)
+            output_srcnn = predict_image(model_srcnn, blurred_image)
+            output_unet = predict_image(model_unet, blurred_image)
 
-            # Save to session
             st.session_state['original'] = image_np
             st.session_state['blurred'] = blurred_image
             st.session_state['srcnn'] = output_srcnn
+            st.session_state['unet'] = output_unet
 
-# Tampilkan hasil
+# ----------------------------
+# Display Results
+# ----------------------------
 if 'original' in st.session_state:
     col1.image(st.session_state['blurred'], caption="Citra Blur", use_container_width=True)
     col2.image(st.session_state['original'], caption="Before", use_container_width=True)
-    col3.image(st.session_state['srcnn'], caption="SRCNN Restored", use_container_width=True)
+    col3.image(st.session_state['srcnn'], caption="SRCNN", use_container_width=True)
+    col4.image(st.session_state['unet'], caption="U-NET", use_container_width=True)
 
-    # Fungsi tampilkan metrik
     def render_metrics(col, title, target):
         mse, rmse, psnr_val, ssim_val = calculate_metrics(st.session_state['original'], target)
         with col:
-            st.markdown(f"**Parameter - {title}**")
-            st.markdown(f"MSE  : {mse:.4f}")
-            st.markdown(f"RMSE : {rmse:.4f}")
-            st.markdown(f"PSNR : {psnr_val:.2f}")
-            st.markdown(f"SSIM : {ssim_val:.4f}")
+            st.markdown(f"**Parameter – {title}**")
+            st.markdown(f"MSE  : `{mse:.4f}`")
+            st.markdown(f"RMSE : `{rmse:.4f}`")
+            st.markdown(f"PSNR : `{psnr_val:.2f}`")
+            st.markdown(f"SSIM : `{ssim_val:.4f}`")
 
     st.markdown("---")
-    col4, col5 = st.columns(2)
-    render_metrics(col4, "Before", st.session_state['blurred'])
-    render_metrics(col5, "SRCNN", st.session_state['srcnn'])
+    col5, col6, col7 = st.columns(3)
+    render_metrics(col5, "Before", st.session_state['blurred'])
+    render_metrics(col6, "SRCNN", st.session_state['srcnn'])
+    render_metrics(col7, "U-NET", st.session_state['unet'])
